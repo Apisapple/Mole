@@ -4,6 +4,7 @@ package main
 
 import (
 	"fmt"
+	"path/filepath"
 	"strings"
 	"sync/atomic"
 )
@@ -414,6 +415,7 @@ func (m model) View() string {
 		fmt.Fprintln(&b)
 		var deleteCount int
 		var totalDeleteSize int64
+		hasAppBundle := false
 		if m.showLargeFiles && len(m.largeMultiSelected) > 0 {
 			deleteCount = len(m.largeMultiSelected)
 			for path := range m.largeMultiSelected {
@@ -430,6 +432,9 @@ func (m model) View() string {
 				for _, entry := range m.entries {
 					if entry.Path == path {
 						totalDeleteSize += entry.Size
+						if isAppBundleEntry(entry) {
+							hasAppBundle = true
+						}
 						break
 					}
 				}
@@ -447,8 +452,37 @@ func (m model) View() string {
 				m.deleteTarget.Name, humanizeBytes(m.deleteTarget.Size),
 				colorGray, colorReset)
 		}
+		if deleteCount > 1 && hasAppBundle {
+			fmt.Fprintf(&b, "%sApp bundles delete the bundle only. Use mo uninstall <App> to also remove support files.%s\n",
+				colorYellow, colorReset)
+		} else if deleteCount <= 1 && isAppBundleEntry(*m.deleteTarget) {
+			fmt.Fprintf(&b, "%sApp bundle: this deletes the bundle only. Use %s to also remove its support files.%s\n",
+				colorYellow, uninstallCommandForApp(m.deleteTarget.Name), colorReset)
+		}
 	}
 	return b.String()
+}
+
+// isAppBundleEntry reports whether a scanned entry is a macOS application
+// bundle: a directory whose name ends in ".app". Contents are not inspected;
+// the hint this powers is informational, so a false positive on a plain
+// folder named like a bundle is harmless.
+func isAppBundleEntry(entry dirEntry) bool {
+	return entry.IsDir && strings.EqualFold(filepath.Ext(entry.Name), ".app")
+}
+
+// uninstallCommandForApp renders the mo uninstall invocation for an app
+// bundle name, quoting names that contain whitespace so the printed command
+// stays copy-pasteable (mo uninstall treats each argument as one app name).
+func uninstallCommandForApp(name string) string {
+	appName := strings.TrimSuffix(name, filepath.Ext(name))
+	if appName == "" {
+		appName = name
+	}
+	if strings.ContainsAny(appName, " \t") {
+		return fmt.Sprintf("mo uninstall %q", appName)
+	}
+	return "mo uninstall " + appName
 }
 
 func allOverviewEntriesPending(entries []dirEntry) bool {
