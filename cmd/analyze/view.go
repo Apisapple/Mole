@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 	"sync/atomic"
+	"unicode"
 )
 
 // View renders the TUI.
@@ -471,18 +472,39 @@ func isAppBundleEntry(entry dirEntry) bool {
 	return entry.IsDir && strings.EqualFold(filepath.Ext(entry.Name), ".app")
 }
 
-// uninstallCommandForApp renders the mo uninstall invocation for an app
-// bundle name, quoting names that contain whitespace so the printed command
-// stays copy-pasteable (mo uninstall treats each argument as one app name).
+// uninstallCommandForApp renders a shell-safe mo uninstall invocation for an
+// app bundle name. Simple names stay unquoted; other printable names use POSIX
+// single-quote escaping. Names that look like flags or contain control
+// characters fall back to the generic placeholder.
 func uninstallCommandForApp(name string) string {
 	appName := strings.TrimSuffix(name, filepath.Ext(name))
 	if appName == "" {
 		appName = name
 	}
-	if strings.ContainsAny(appName, " \t") {
-		return fmt.Sprintf("mo uninstall %q", appName)
+	if appName == "" || strings.HasPrefix(appName, "-") || strings.IndexFunc(appName, unicode.IsControl) >= 0 {
+		return "mo uninstall <App>"
 	}
-	return "mo uninstall " + appName
+	if isShellSafeUnquotedAppName(appName) {
+		return "mo uninstall " + appName
+	}
+	return "mo uninstall '" + strings.ReplaceAll(appName, "'", `'\''`) + "'"
+}
+
+func isShellSafeUnquotedAppName(name string) bool {
+	for _, r := range name {
+		if r >= 'a' && r <= 'z' ||
+			r >= 'A' && r <= 'Z' ||
+			r >= '0' && r <= '9' {
+			continue
+		}
+		switch r {
+		case '_', '-', '.', '+':
+			continue
+		default:
+			return false
+		}
+	}
+	return name != ""
 }
 
 func allOverviewEntriesPending(entries []dirEntry) bool {

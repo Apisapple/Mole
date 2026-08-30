@@ -446,17 +446,26 @@ func TestIsAppBundleEntry(t *testing.T) {
 
 func TestUninstallCommandForApp(t *testing.T) {
 	tests := []struct {
-		name string
-		want string
+		name  string
+		input string
+		want  string
 	}{
-		{name: "Safari.app", want: "mo uninstall Safari"},
-		{name: "Google Chrome.app", want: `mo uninstall "Google Chrome"`},
+		{name: "simple", input: "Safari.app", want: "mo uninstall Safari"},
+		{name: "space", input: "Google Chrome.app", want: "mo uninstall 'Google Chrome'"},
+		{name: "dollar", input: "My$App.app", want: "mo uninstall 'My$App'"},
+		{name: "command substitution", input: "Unsafe$(printf HACKED).app", want: "mo uninstall 'Unsafe$(printf HACKED)'"},
+		{name: "semicolon", input: "Foo;Bar.app", want: "mo uninstall 'Foo;Bar'"},
+		{name: "backtick", input: "My`App.app", want: "mo uninstall 'My`App'"},
+		{name: "single quote", input: "Bob's App.app", want: `mo uninstall 'Bob'\''s App'`},
+		{name: "leading dash", input: "-Example.app", want: "mo uninstall <App>"},
+		{name: "tab", input: "Tabbed\tApp.app", want: "mo uninstall <App>"},
+		{name: "newline", input: "Split\nApp.app", want: "mo uninstall <App>"},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := uninstallCommandForApp(tt.name); got != tt.want {
-				t.Errorf("uninstallCommandForApp(%q) = %q, want %q", tt.name, got, tt.want)
+			if got := uninstallCommandForApp(tt.input); got != tt.want {
+				t.Errorf("uninstallCommandForApp(%q) = %q, want %q", tt.input, got, tt.want)
 			}
 		})
 	}
