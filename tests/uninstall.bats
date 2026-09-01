@@ -649,6 +649,67 @@ EOF
     [ "$status" -eq 0 ]
 }
 
+@test "live same-bundle guard finds mixed-case siblings but ignores nested and unrelated bundles" {
+    local app_root="$HOME/live-mixed-case-apps"
+    mkdir -p "$app_root/Selected.app/Contents" \
+        "$app_root/Unrelated.App/Contents"
+
+    run env HOME="$HOME" PROJECT_ROOT="$PROJECT_ROOT" APP_ROOT="$app_root" \
+        /bin/bash --noprofile --norc <<'EOF'
+set -euo pipefail
+source "$PROJECT_ROOT/lib/core/common.sh"
+source "$PROJECT_ROOT/lib/uninstall/batch.sh"
+pkg_receipt_nonstandard_app_paths() { :; }
+
+write_bundle_id() {
+    local path="$1"
+    local bundle_id="$2"
+    mkdir -p "$path/Contents"
+    printf '%s\n' \
+        '<?xml version="1.0" encoding="UTF-8"?>' \
+        '<plist version="1.0"><dict>' \
+        "<key>CFBundleIdentifier</key><string>$bundle_id</string>" \
+        '</dict></plist>' \
+        > "$path/Contents/Info.plist"
+}
+
+write_bundle_id "$APP_ROOT/Selected.app" "com.example.live-mixed"
+write_bundle_id "$APP_ROOT/Unrelated.App" "com.example.unrelated"
+selected_apps=("0|$APP_ROOT/Selected.app|Selected|com.example.live-mixed|0|Never")
+_MOLE_UNINSTALL_LIVE_APP_ROOTS=("$APP_ROOT")
+_MOLE_UNINSTALL_LIVE_VOLUMES_ROOT="$HOME/no-volumes"
+
+# A case-variant app with another id must not block the selected app.
+if uninstall_live_bundle_has_other_install \
+    "com.example.live-mixed" "$APP_ROOT/Selected.app"; then
+    echo "WRONG: unrelated app reported as a sibling"
+    exit 1
+fi
+[[ ${#_MOLE_UNINSTALL_LIVE_SIBLING_PATHS[@]} -eq 0 ]] || exit 1
+
+# A nested helper belongs to Container.APP and is not another installation.
+write_bundle_id "$APP_ROOT/Container.APP/Nested.app" "com.example.live-mixed"
+if uninstall_live_bundle_has_other_install \
+    "com.example.live-mixed" "$APP_ROOT/Selected.app"; then
+    echo "WRONG: nested app reported as a sibling"
+    exit 1
+fi
+[[ ${#_MOLE_UNINSTALL_LIVE_SIBLING_PATHS[@]} -eq 0 ]] || exit 1
+
+# A top-level surviving .APP with the same id must trip the destructive guard.
+write_bundle_id "$APP_ROOT/Survivor.APP" "com.example.live-mixed"
+uninstall_live_bundle_has_other_install \
+    "com.example.live-mixed" "$APP_ROOT/Selected.app"
+[[ ${#_MOLE_UNINSTALL_LIVE_SIBLING_PATHS[@]} -eq 1 ]] || exit 1
+[[ "${_MOLE_UNINSTALL_LIVE_SIBLING_PATHS[0]}" == "$APP_ROOT/Survivor.APP" ]]
+EOF
+
+    [ "$status" -eq 0 ] || {
+        echo "$output"
+        return 1
+    }
+}
+
 @test "live same-bundle scan accepts dot-app text in a volume ancestor" {
     local app_root="$HOME/Backup.app-data/Applications"
     mkdir -p "$app_root/Survivor.app/Contents" "$HOME/Selected.app"
@@ -2537,6 +2598,35 @@ EOF
     [[ "$output" != *" -f "* ]] || return 1
     [[ "$output" != *" -domain "* ]] || return 1
     [ "$(printf '%s\n' "$output" | grep -c '^CALL:')" -eq 1 ] || return 1
+}
+
+@test "unregister_app_bundle accepts mixed-case app suffixes only in real mode" {
+    run env HOME="$HOME" PROJECT_ROOT="$PROJECT_ROOT" /bin/bash --noprofile --norc << 'EOF'
+set -euo pipefail
+source "$PROJECT_ROOT/lib/core/common.sh"
+source "$PROJECT_ROOT/lib/uninstall/batch.sh"
+
+test_home="$HOME/launchservices-unregister-home"
+mkdir -p "$test_home/Upper.APP" "$test_home/Plain.bundle"
+log_file="$test_home/lsregister-calls.log"
+: > "$log_file"
+
+get_lsregister_path() { echo "/bin/echo"; }
+run_with_timeout() {
+    local duration="$1"
+    shift
+    echo "CALL:$duration:$*" >> "$log_file"
+}
+
+MOLE_DRY_RUN=0 unregister_app_bundle "$test_home/Upper.APP"
+MOLE_DRY_RUN=0 unregister_app_bundle "$test_home/Plain.bundle"
+MOLE_DRY_RUN=1 unregister_app_bundle "$test_home/Upper.APP"
+cat "$log_file"
+EOF
+
+    [ "$status" -eq 0 ] || return 1
+    [[ "$output" == *"CALL:5:/bin/echo -u $HOME/launchservices-unregister-home/Upper.APP"* ]] || return 1
+    [ "$(printf '%s\n' "$output" | grep -c '^CALL:')" -eq 1 ]
 }
 
 @test "remove_mole deletes manual binaries and caches" {

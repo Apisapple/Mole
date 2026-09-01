@@ -164,7 +164,7 @@ uninstall_resolve_display_name() {
         fi
     fi
 
-    display_name="${display_name%.app}"
+    display_name="${display_name%.[aA][pP][pP]}"
     display_name="${display_name//|/-}"
     display_name="${display_name//[$'\t\r\n']/}"
     echo "$display_name"
@@ -402,9 +402,9 @@ uninstall_should_skip_app_path() {
 
     [[ -e "$app_path" ]] || return 0
 
-    # Skip nested apps inside another .app bundle.
+    # Skip nested apps inside another case-variant .app bundle.
     local parent_dir="${app_path%/*}"
-    if [[ "$parent_dir" == *".app" || "$parent_dir" == *".app/"* ]]; then
+    if [[ "$parent_dir" == *.[aA][pP][pP] || "$parent_dir" == *.[aA][pP][pP]/* ]]; then
         return 0
     fi
 
@@ -526,7 +526,7 @@ uninstall_print_app_paths_with_mtime() {
         [[ -n "$app_path" ]] || continue
         app_mtime=$(get_file_mtime "$app_path")
         printf '%s\t%s\n' "${app_mtime:-0}" "$app_path"
-    done < <(command find "$app_dir" -maxdepth 3 -name "*.app" -print0 2> /dev/null)
+    done < <(command find "$app_dir" -maxdepth 3 -iname "*.app" -print0 2> /dev/null)
 }
 
 uninstall_app_inventory_fingerprint() {
@@ -604,7 +604,7 @@ _scan_discover_apps() {
 
         local already_scanned=false
         for app_dir in "${app_dirs[@]}"; do
-            if [[ "$pkg_app_path" == "$app_dir"/*.app ]]; then
+            if [[ "$pkg_app_path" == "$app_dir"/*.[aA][pP][pP] ]]; then
                 already_scanned=true
                 break
             fi
@@ -612,7 +612,7 @@ _scan_discover_apps() {
         [[ "$already_scanned" == true ]] && continue
 
         local app_name="${pkg_app_path##*/}"
-        app_name="${app_name%.app}"
+        app_name="${app_name%.[aA][pP][pP]}"
 
         local app_mtime
         app_mtime=$(get_file_mtime "$pkg_app_path")
@@ -627,7 +627,7 @@ _scan_discover_apps() {
             if [[ ! -e "$app_path" ]]; then continue; fi
 
             local app_name="${app_path##*/}"
-            app_name="${app_name%.app}"
+            app_name="${app_name%.[aA][pP][pP]}"
 
             uninstall_should_skip_app_path "$app_path" && continue
 
@@ -733,7 +733,7 @@ _scan_resolve_uncached() {
             display_name=$(uninstall_resolve_display_name "$app_path" "$app_name")
         fi
 
-        display_name="${display_name%.app}"
+        display_name="${display_name%.[aA][pP][pP]}"
         display_name="${display_name//|/-}"
         display_name="${display_name//[$'\t\r\n']/}"
 
@@ -794,7 +794,7 @@ _scan_dedupe_bundle_ids() {
                 return 0
             }
             rest = substr(path, length(prefix) + 1)
-            return index(rest, "/") == 0 && rest ~ /[.]app$/
+            return index(rest, "/") == 0 && tolower(rest) ~ /[.]app$/
         }
         function path_rank(path) {
             if (direct_app_under(path, "/Applications/")) {

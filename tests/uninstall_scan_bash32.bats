@@ -163,6 +163,66 @@ EOF
 	[ "$status" -ne 0 ]
 }
 
+@test "app discovery treats the app suffix case-insensitively without admitting nested bundles" {
+	src="$HOME/uninstall_source.sh"
+	sourceable_uninstall_sh "$src"
+
+	apps_root="$HOME/Applications"
+	mkdir -p \
+		"$apps_root/Upper.APP" \
+		"$apps_root/Mixed.App" \
+		"$apps_root/Lower.app" \
+		"$apps_root/Receipt.APP" \
+		"$apps_root/Outer.APP/Nested.app"
+
+	run env HOME="$HOME" PROJECT_ROOT="$PROJECT_ROOT" \
+		APPS_ROOT="$apps_root" SRC_PATH="$src" \
+		/bin/bash --noprofile --norc <<'EOF'
+set -euo pipefail
+source "$SRC_PATH"
+
+uninstall_print_app_search_dirs() { printf '%s\n' "$APPS_ROOT"; }
+pkg_receipt_nonstandard_app_paths() { printf '%s\n' "$APPS_ROOT/Receipt.APP"; }
+get_file_mtime() { printf '1\n'; }
+
+discovered_file="$HOME/discovered"
+: > "$discovered_file"
+_scan_discover_apps
+cat "$discovered_file"
+EOF
+
+	[ "$status" -eq 0 ] || return 1
+	[ "$(printf '%s\n' "$output" | grep -cF "$apps_root/Upper.APP|Upper|1")" -eq 1 ] || return 1
+	[ "$(printf '%s\n' "$output" | grep -cF "$apps_root/Mixed.App|Mixed|1")" -eq 1 ] || return 1
+	[ "$(printf '%s\n' "$output" | grep -cF "$apps_root/Lower.app|Lower|1")" -eq 1 ] || return 1
+	[ "$(printf '%s\n' "$output" | grep -cF "$apps_root/Receipt.APP|Receipt|1")" -eq 1 ] || return 1
+	[[ "$output" != *"Outer.APP/Nested.app"* ]]
+}
+
+@test "bundle dedupe ranks direct mixed-case app paths before user copies" {
+	src="$HOME/uninstall_source.sh"
+	sourceable_uninstall_sh "$src"
+
+	run env HOME="$HOME" PROJECT_ROOT="$PROJECT_ROOT" SRC_PATH="$src" \
+		/bin/bash --noprofile --norc <<'EOF'
+set -euo pipefail
+source "$SRC_PATH"
+
+scan_raw_file="$HOME/raw"
+printf '%s\n' \
+	"$HOME/Applications/Shared.APP|Shared|com.example.shared|1|1" \
+	"/Applications/Shared.APP|Shared|com.example.shared|1|1" \
+	> "$scan_raw_file"
+
+_scan_dedupe_bundle_ids
+cat "$scan_raw_file"
+EOF
+
+	[ "$status" -eq 0 ] || return 1
+	[ "$(printf '%s\n' "$output" | grep -cF 'com.example.shared')" -eq 1 ] || return 1
+	[[ "$output" == "/Applications/Shared.APP|Shared|com.example.shared|1|1" ]]
+}
+
 @test "scan_applications surfaces inline physical app size before deferred refresh (#1126)" {
 	src="$HOME/uninstall_source.sh"
 	sourceable_uninstall_sh "$src"
