@@ -480,7 +480,9 @@ unregister_app_bundle() {
     return 0
 }
 
-# Compact and rebuild LaunchServices after uninstall batch to clear stale app metadata.
+# Compact LaunchServices after uninstall without forcing every app and extension
+# to re-register. A domain-wide rebuild can terminate active app extensions,
+# including Network Extension packet tunnels such as Shadowrocket's.
 refresh_launch_services_after_uninstall() {
     local lsregister
     lsregister=$(get_lsregister_path)
@@ -488,26 +490,10 @@ refresh_launch_services_after_uninstall() {
 
     [[ "${MOLE_DRY_RUN:-0}" == "1" ]] && return 0
 
-    local success=0
-    set +e
-    # Add 10s timeout to prevent hanging (gc is usually fast)
-    # run_with_timeout falls back to shell implementation if timeout command unavailable
+    # Best-effort and bounded: stale records are collected, while the targeted
+    # -u call above handles the app bundle that was actually removed.
     run_with_timeout "$MOLE_TIMEOUT_PKG_LIST_SEC" "$lsregister" -gc > /dev/null 2>&1 || true
-    # 15s: lsregister rebuild can be slow on some systems, see lib/core/timeouts.sh
-    run_with_timeout 15 "$lsregister" -r -f -domain local -domain user -domain system > /dev/null 2>&1
-    success=$?
-    # 124 = timeout exit code (from run_with_timeout or timeout command)
-    if [[ $success -eq 124 ]]; then
-        debug_log "LaunchServices rebuild timed out, trying lighter version"
-        run_with_timeout "$MOLE_TIMEOUT_PKG_LIST_SEC" "$lsregister" -r -f -domain local -domain user > /dev/null 2>&1
-        success=$?
-    elif [[ $success -ne 0 ]]; then
-        run_with_timeout "$MOLE_TIMEOUT_PKG_LIST_SEC" "$lsregister" -r -f -domain local -domain user > /dev/null 2>&1
-        success=$?
-    fi
-    set -e
-
-    [[ $success -eq 0 || $success -eq 124 ]]
+    return 0
 }
 
 # Remove macOS Login Items for an app
