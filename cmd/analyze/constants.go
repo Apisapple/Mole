@@ -64,7 +64,7 @@ const (
 	maxDirWorkers      = 6
 	openCommandTimeout = 10 * time.Second
 	scanSendTimeout    = 100 * time.Millisecond
-	uiTickInterval     = 120 * time.Millisecond
+	uiTickInterval     = 100 * time.Millisecond
 )
 
 var overviewDuIgnoreNames = map[string]bool{
