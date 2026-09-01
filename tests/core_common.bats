@@ -34,7 +34,7 @@ setup() {
 
 @test "mo_spinner_chars returns default sequence" {
     result="$(HOME="$HOME" /bin/bash --noprofile --norc -c "source '$PROJECT_ROOT/lib/core/common.sh'; mo_spinner_chars")"
-    [ "$result" = "|/-\\" ]
+    [ "$result" = "⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏" ]
 }
 
 @test "detect_architecture maps current CPU to friendly label" {

@@ -64,7 +64,7 @@ const (
 	maxDirWorkers      = 6
 	openCommandTimeout = 10 * time.Second
 	scanSendTimeout    = 100 * time.Millisecond
-	uiTickInterval     = 100 * time.Millisecond
+	uiTickInterval     = 120 * time.Millisecond
 )
 
 var overviewDuIgnoreNames = map[string]bool{
@@ -292,7 +292,7 @@ var skipExtensions = map[string]bool{
 	".hx":     true,
 }
 
-var spinnerFrames = []string{"|", "/", "-", "\\", "|", "/", "-", "\\"}
+var spinnerFrames = []string{"⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"}
 
 const (
 	colorPurple     = "\033[0;35m"

@@ -411,7 +411,7 @@ start_inline_spinner() {
                 # Output to stderr to avoid interfering with stdout
                 printf "${frame_lead}${MOLE_SPINNER_PREFIX:-}${BLUE}%s${NC} %s" "$c" "$current_message" >&2 || break
                 i=$((i + 1))
-                /bin/sleep 0.05
+                /bin/sleep 0.08
             done
 
             # Clean up stop file before exiting
@@ -489,7 +489,7 @@ update_inline_spinner_message() {
 
 # Get spinner characters
 mo_spinner_chars() {
-    printf "%s" "|/-\\"
+    printf "%s" "⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏"
 }
 
 # Format relative time for compact display (e.g., 3d ago)
