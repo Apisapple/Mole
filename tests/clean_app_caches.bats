@@ -923,6 +923,143 @@ EOF
     [[ "$output" == *"Microsoft Teams legacy logs"* ]]
 }
 
+@test "clean_communication_apps cleans Feishu embedded webview Service Worker per profile" {
+    run env HOME="$HOME" PROJECT_ROOT="$PROJECT_ROOT" /bin/bash --noprofile --norc << 'EOF'
+set -euo pipefail
+feishu_base="$HOME/Library/Application Support/LarkShell/aha/users"
+lark_base="$HOME/Library/Application Support/LarkInternational/aha/users"
+mkdir -p "$feishu_base/57bea93a/profile_explorer/Service Worker/CacheStorage"
+mkdir -p "$feishu_base/6ef03470/profile_explorer/Service Worker/CacheStorage"
+mkdir -p "$lark_base/70ac6ef0/profile_explorer/Service Worker/CacheStorage"
+# A non-profile sibling under users/ must be ignored.
+mkdir -p "$feishu_base/global"
+source "$PROJECT_ROOT/lib/core/common.sh"
+source "$PROJECT_ROOT/lib/clean/caches.sh"
+source "$PROJECT_ROOT/lib/clean/app_caches.sh"
+safe_clean() { echo "SC|$2"; }
+feishu_or_lark_running() { return 1; }
+clean_service_worker_cache() { echo "SW|$1|$2|$3|$4"; }
+clean_communication_apps
+EOF
+
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"SW|Feishu|$HOME/Library/Application Support/LarkShell/aha/users/57bea93a/profile_explorer/Service Worker/CacheStorage|_feishu_service_worker_delete_guard_allows|"* ]] || return 1
+    [[ "$output" == *"SW|Feishu|$HOME/Library/Application Support/LarkShell/aha/users/6ef03470/profile_explorer/Service Worker/CacheStorage|_feishu_service_worker_delete_guard_allows|"* ]] || return 1
+    [[ "$output" == *"SW|Lark|$HOME/Library/Application Support/LarkInternational/aha/users/70ac6ef0/profile_explorer/Service Worker/CacheStorage|_feishu_service_worker_delete_guard_allows|"* ]] || return 1
+    [[ "$output" != *"users/global/"* ]] || return 1
+}
+
+@test "clean_feishu_service_worker_caches preserves pipe characters in profile paths" {
+    local pipe_home="$HOME/home|pipe"
+    run env HOME="$pipe_home" PROJECT_ROOT="$PROJECT_ROOT" /bin/bash --noprofile --norc << 'EOF'
+set -euo pipefail
+cache="$HOME/Library/Application Support/LarkShell/aha/users/57bea93a/profile_explorer/Service Worker/CacheStorage"
+mkdir -p "$cache"
+source "$PROJECT_ROOT/lib/core/common.sh"
+source "$PROJECT_ROOT/lib/clean/caches.sh"
+source "$PROJECT_ROOT/lib/clean/app_caches.sh"
+feishu_or_lark_running() { return 1; }
+clean_service_worker_cache() { printf 'SW:%s:%s\n' "$1" "$2"; }
+clean_feishu_service_worker_caches
+EOF
+
+    [ "$status" -eq 0 ] || return 1
+    [[ "$output" == *"SW:Feishu:$pipe_home/Library/Application Support/LarkShell/aha/users/57bea93a/profile_explorer/Service Worker/CacheStorage"* ]]
+}
+
+@test "clean_feishu_service_worker_caches skips all profiles while owner is running" {
+    run env HOME="$HOME" PROJECT_ROOT="$PROJECT_ROOT" /bin/bash --noprofile --norc << 'EOF'
+set -euo pipefail
+cache="$HOME/Library/Application Support/LarkShell/aha/users/57bea93a/profile_explorer/Service Worker/CacheStorage"
+mkdir -p "$cache/origin/cache"
+source "$PROJECT_ROOT/lib/core/common.sh"
+source "$PROJECT_ROOT/lib/clean/caches.sh"
+source "$PROJECT_ROOT/lib/clean/app_caches.sh"
+feishu_or_lark_running() { return 0; }
+mole_defer_cleanup_family() { echo "DEFER:$1"; }
+safe_remove() { echo "UNEXPECTED_REMOVE:$1"; return 0; }
+clean_feishu_service_worker_caches
+EOF
+
+    [ "$status" -eq 0 ] || return 1
+    [[ "$output" == *"DEFER:Feishu/Lark"* ]] || return 1
+    [[ "$output" != *"UNEXPECTED_REMOVE"* ]]
+}
+
+@test "clean_feishu_service_worker_caches fails closed on unknown owner state" {
+    run env HOME="$HOME" PROJECT_ROOT="$PROJECT_ROOT" /bin/bash --noprofile --norc << 'EOF'
+set -euo pipefail
+cache="$HOME/Library/Application Support/LarkShell/aha/users/57bea93a/profile_explorer/Service Worker/CacheStorage"
+mkdir -p "$cache/origin/cache"
+source "$PROJECT_ROOT/lib/core/common.sh"
+source "$PROJECT_ROOT/lib/clean/caches.sh"
+source "$PROJECT_ROOT/lib/clean/app_caches.sh"
+feishu_or_lark_running() { return 2; }
+mole_defer_cleanup_family() { echo "UNEXPECTED_DEFER:$1"; }
+safe_remove() { echo "UNEXPECTED_REMOVE:$1"; return 0; }
+note_activity() { :; }
+clean_feishu_service_worker_caches
+EOF
+
+    [ "$status" -eq 0 ] || return 1
+    [[ "$output" == *"Feishu/Lark Service Worker · stopped (process state unknown)"* ]] || return 1
+    [[ "$output" != *"UNEXPECTED_REMOVE"* ]] || return 1
+    [[ "$output" != *"UNEXPECTED_DEFER"* ]]
+}
+
+@test "clean_feishu_service_worker_caches rechecks owner after sizing" {
+    run env HOME="$HOME" PROJECT_ROOT="$PROJECT_ROOT" /bin/bash --noprofile --norc << 'EOF'
+set -euo pipefail
+marker="$HOME/feishu-started"
+source "$PROJECT_ROOT/lib/core/common.sh"
+source "$PROJECT_ROOT/lib/clean/caches.sh"
+source "$PROJECT_ROOT/lib/clean/app_caches.sh"
+declare -a PROTECTED_SW_DOMAINS=("never.invalid")
+cache="$HOME/Library/Application Support/LarkShell/aha/users/57bea93a/profile_explorer/Service Worker/CacheStorage"
+candidate="$cache/origin/cache"
+mkdir -p "$candidate"
+feishu_or_lark_running() { [[ -e "$marker" ]] && return 0 || return 1; }
+mole_defer_cleanup_family() { echo "DEFER:$1"; }
+safe_remove() { echo "UNEXPECTED_REMOVE:$1"; return 0; }
+note_activity() { :; }
+run_with_timeout() {
+    shift
+    if [[ "$1" == "sh" ]]; then
+        printf '%s\n' "$candidate"
+        return 0
+    fi
+    if [[ "$1" == "du" ]]; then
+        touch "$marker"
+        printf '512\t%s\n' "$candidate"
+        return 0
+    fi
+    "$@"
+}
+clean_feishu_service_worker_caches
+EOF
+
+    [ "$status" -eq 0 ] || return 1
+    [[ "$output" == *"DEFER:Feishu/Lark"* ]] || return 1
+    [[ "$output" != *"UNEXPECTED_REMOVE"* ]]
+}
+
+@test "clean_feishu_service_worker_caches is a no-op when the aha profile root is absent" {
+    local empty_home
+    empty_home="$(mktemp -d "${BATS_TEST_DIRNAME}/tmp-app-caches.XXXXXX")"
+    run env HOME="$empty_home" PROJECT_ROOT="$PROJECT_ROOT" /bin/bash --noprofile --norc << 'EOF'
+set -euo pipefail
+source "$PROJECT_ROOT/lib/clean/app_caches.sh"
+clean_service_worker_cache() { echo "unexpected SW call"; }
+clean_feishu_service_worker_caches
+echo "done-no-op"
+EOF
+    rm -rf "$empty_home"
+
+    [ "$status" -eq 0 ]
+    [[ "$output" != *"unexpected SW call"* ]] || return 1
+    [[ "$output" == *"done-no-op"* ]] || return 1
+}
+
 @test "clean_gaming_platforms includes steam and minecraft related caches" {
     run env HOME="$HOME" PROJECT_ROOT="$PROJECT_ROOT" /bin/bash --noprofile --norc << 'EOF'
 set -euo pipefail
