@@ -235,7 +235,7 @@ discover_login_item_helper_bundle_ids() {
     scan_file=$(create_temp_file) || return 1
     local scan_rc=0
     _mole_uninstall_materialize_find0 "$scan_file" \
-        "$login_items_root" -maxdepth 1 -name "*.app" \
+        "$login_items_root" -maxdepth 1 -iname "*.app" \
         -print0 || scan_rc=$?
     if [[ $scan_rc -ne 0 ]]; then
         rm -f -- "$scan_file" 2> /dev/null || true # SAFE: exact tracked temp file created above
@@ -465,7 +465,7 @@ unregister_app_bundle() {
     local app_path="$1"
 
     [[ -n "$app_path" && -e "$app_path" ]] || return 0
-    [[ "$app_path" == *.app ]] || return 0
+    [[ "$app_path" == *.[aA][pP][pP] ]] || return 0
 
     local lsregister
     lsregister=$(get_lsregister_path)
@@ -510,7 +510,7 @@ remove_login_item() {
     [[ -z "$app_name" && -z "$bundle_id" ]] && return 0
 
     # Strip .app suffix if present (login items don't include it)
-    local clean_name="${app_name%.app}"
+    local clean_name="${app_name%.[aA][pP][pP]}"
 
     # Remove from Login Items using index-based deletion (handles broken items)
     if [[ -n "$clean_name" ]]; then
@@ -750,7 +750,7 @@ _uninstall_live_candidate_is_nested_app() {
     local component
     while [[ -n "$parent" && "$parent" != "." ]]; do
         component="${parent%%/*}"
-        [[ "$component" == *.app ]] && return 0
+        [[ "$component" == *.[aA][pP][pP] ]] && return 0
         [[ "$parent" == */* ]] || break
         parent="${parent#*/}"
     done
@@ -876,7 +876,7 @@ _uninstall_collect_live_sibling_candidate() {
         # and a single such app aborted the uninstall of every other app on
         # the machine (#1339). They are ordinary installs, not a mystery.
         local wrapped=""
-        for wrapped in "$app"/Wrapper/*.app/Info.plist; do
+        for wrapped in "$app"/Wrapper/*.[aA][pP][pP]/Info.plist; do
             if [[ -f "$wrapped" ]]; then
                 info="$wrapped"
                 break
@@ -990,7 +990,7 @@ uninstall_live_bundle_has_other_install() {
             -mindepth 2 -maxdepth 2 \
             \( \
             \( -type d -name Applications \) -o \
-            \( \( -type d -o -type l \) -name '*.app' \) \
+            \( \( -type d -o -type l \) -iname '*.app' \) \
             \) || volume_scan_rc=$?
         if [[ $volume_scan_rc -eq $MOLE_UNINSTALL_SCAN_PARTIAL || $volume_scan_rc -eq 124 ]]; then
             # Some volume was unreadable, or the budget ran out before every
@@ -1024,7 +1024,7 @@ uninstall_live_bundle_has_other_install() {
         local scan_rc=0
         _uninstall_materialize_complete_find0 "$scan_file" \
             "$deadline_seconds" "$root" -maxdepth 3 \
-            \( -type d -o -type l \) -name '*.app' || scan_rc=$?
+            \( -type d -o -type l \) -iname '*.app' || scan_rc=$?
         if [[ $scan_rc -eq $MOLE_UNINSTALL_SCAN_PARTIAL ]]; then
             # Unreadable subpaths under an app root. The apps this listing did
             # find are still real, so keep going and let the doubt decide the
@@ -1196,7 +1196,7 @@ uninstall_surviving_sibling_names() {
         [[ "$is_selected" == true ]] && continue
 
         local other_base="${other_path##*/}"
-        other_base="${other_base%.app}"
+        other_base="${other_base%.[aA][pP][pP]}"
 
         # Emit each identifier plus its version-suffix-stripped base: a
         # survivor named "Foo Beta.app" also claims "Foo"-keyed dirs via the
@@ -1355,7 +1355,7 @@ _batch_scan_app_details() {
         # Leftover matching is destructive and must use the current bundle
         # basename, not a display name cached when the selection list opened.
         local discovery_app_name="${app_path##*/}"
-        discovery_app_name="${discovery_app_name%.app}"
+        discovery_app_name="${discovery_app_name%.[aA][pP][pP]}"
 
         local official_vendor=""
         if official_vendor=$(official_uninstaller_vendor "$bundle_id" "$app_name" "$app_path" 2> /dev/null); then
@@ -2380,7 +2380,8 @@ _batch_render_summary() {
 
             for success_path in "${success_items[@]}"; do
                 local display_name
-                display_name=$(basename "$success_path" .app)
+                display_name=$(basename "$success_path")
+                display_name="${display_name%.[aA][pP][pP]}"
                 local display_item="${GREEN}${display_name}${NC}"
 
                 if ((idx % 3 == 0)); then
