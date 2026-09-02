@@ -544,6 +544,54 @@ EOF
     [[ "$output" != *"UNEXPECTED_SAFE_CLEAN"* ]]
 }
 
+@test "whitelist row keeps FCP proxy media while render files are cleaned (#1499)" {
+    run env HOME="$HOME/fcp-1499" PROJECT_ROOT="$PROJECT_ROOT" /bin/bash --noprofile --norc << 'EOF'
+set -euo pipefail
+source "$PROJECT_ROOT/lib/manage/whitelist.sh"
+source "$PROJECT_ROOT/lib/clean/app_caches.sh"
+
+# Flat and nested libraries: the nested one pins the segment-spanning glob.
+flat_proxy="$HOME/Movies/Project.fcpbundle/Event/Transcoded Media/Proxy Media"
+flat_render="$HOME/Movies/Project.fcpbundle/Event/Render Files/High Quality Media"
+nested_proxy="$HOME/Movies/Sub/Nested.fcpbundle/Event/Transcoded Media/Proxy Media"
+nested_render="$HOME/Movies/Sub/Nested.fcpbundle/Event/Render Files/High Quality Media"
+mkdir -p "$flat_proxy" "$flat_render" "$nested_proxy" "$nested_render"
+touch "$flat_proxy/proxy.mov" "$flat_render/render.mov"
+touch "$nested_proxy/proxy.mov" "$nested_render/render.mov"
+
+# Use the shipped catalog pattern, not a hand-written copy, so this test goes
+# red when the row is absent (pre-fix) or its pattern drifts.
+fcp_pattern=""
+while IFS='|' read -r name pattern _; do
+    if [[ "$name" == "Final Cut Pro proxy media"* ]]; then
+        fcp_pattern="${pattern/\$HOME/$HOME}"
+    fi
+done < <(get_all_cache_items)
+[[ -n "$fcp_pattern" ]] || exit 1
+
+WHITELIST_PATTERNS=("$fcp_pattern")
+pgrep() { return 1; }
+defer_cleanup_family() { echo "UNEXPECTED_DEFER:$1"; }
+safe_clean() {
+    local arg
+    for arg in "$@"; do
+        printf 'CLEAN:%s\n' "$arg"
+    done
+}
+
+clean_final_cut_pro_generated_caches
+EOF
+
+    [ "$status" -eq 0 ] || {
+        echo "$output"
+        return 1
+    }
+    [[ "$output" == *"CLEAN:$HOME/fcp-1499/Movies/Project.fcpbundle/Event/Render Files/High Quality Media"* ]] || return 1
+    [[ "$output" == *"CLEAN:$HOME/fcp-1499/Movies/Sub/Nested.fcpbundle/Event/Render Files/High Quality Media"* ]] || return 1
+    [[ "$output" != *"Transcoded Media/Proxy Media"* ]] || return 1
+    [[ "$output" != *"UNEXPECTED_DEFER"* ]]
+}
+
 @test "clean_jianying_pro_generated_caches targets only whitelisted regenerable subdirs" {
     run env HOME="$HOME" PROJECT_ROOT="$PROJECT_ROOT" /bin/bash --noprofile --norc << 'EOF'
 set -euo pipefail
