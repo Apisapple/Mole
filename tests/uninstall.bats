@@ -2773,6 +2773,26 @@ EOF
     [[ "$output" == *"Test Application"* ]]
 }
 
+@test "match_apps_by_name prefers an exact mixed-case bundle basename" {
+    run /bin/bash --noprofile --norc << 'EOF'
+set -euo pipefail
+selected_apps=()
+apps_data=(
+	"1000|$HOME/Applications/Foo.APP|Different Display Name|com.example.Foo|1 MB|1000000|1024"
+	"1001|$HOME/Applications/Foo Bar.app|Foo Bar|com.example.FooBar|1 MB|1000001|1024"
+)
+source "$PROJECT_ROOT/tests/test_match_apps_helper.sh"
+match_apps_by_name "Foo"
+echo "count=${#selected_apps[@]}"
+echo "match=${selected_apps[0]}"
+EOF
+
+    [ "$status" -eq 0 ] || return 1
+    [[ "$output" == *"count=1"* ]] || return 1
+    [[ "$output" == *"/Foo.APP|"* ]] || return 1
+    [[ "$output" != *"/Foo Bar.app|"* ]]
+}
+
 @test "match_apps_by_name warns on no match" {
     run /bin/bash --noprofile --norc << 'EOF'
 set -euo pipefail

@@ -586,7 +586,7 @@ MOCK
 	# The copy must rename the load guard too: common.sh already sourced the
 	# real file, and the readonly guard would silently keep the original
 	# function, turning this test into a no-op against the wrong code.
-	sed -e "s|/usr/local/\*.app|$HOME/usr-local/*.app|g" \
+	sed -e "s|/usr/local/|$HOME/usr-local/|g" \
 		-e 's|MOLE_PKG_RECEIPTS_LOADED|MOLE_PKG_RECEIPTS_TEST_LOADED|g' \
 		"$PROJECT_ROOT/lib/core/pkg_receipts.sh" > "$HOME/pkg_receipts_test.sh"
 
@@ -608,6 +608,48 @@ EOF
 	}
 	[[ "$output" != *"unbound variable"* ]] || return 1
 	[[ "$output" == *"RC=0 OUT=$HOME/usr-local/Example.app"* ]] || return 1
+}
+
+@test "receipt discovery preserves mixed-case app bundles in complete scans" {
+	local mock_bin="$HOME/mock-pkgutil-mixed-app"
+	mkdir -p "$mock_bin" \
+		"$HOME/usr-local/Direct.APP" \
+		"$HOME/usr-local/Nested.App/Contents"
+	cat > "$mock_bin/pkgutil" << MOCK
+#!/bin/bash
+case "\$1" in
+    --pkgs) printf 'com.example.mixed-apps\n' ;;
+    --files)
+        printf '%s\n' \
+            '${HOME#/}/usr-local/Direct.APP' \
+            '${HOME#/}/usr-local/Nested.App/Contents/Info.plist'
+        ;;
+esac
+MOCK
+	chmod +x "$mock_bin/pkgutil"
+
+	# Redirect the fixed production prefix into the isolated HOME while keeping
+	# the real mixed-case parser and complete-scan contract under test.
+	sed -e "s|/usr/local/|$HOME/usr-local/|g" \
+		-e 's|MOLE_PKG_RECEIPTS_LOADED|MOLE_PKG_RECEIPTS_MIXED_TEST_LOADED|g' \
+		"$PROJECT_ROOT/lib/core/pkg_receipts.sh" > "$HOME/pkg_receipts_mixed_test.sh"
+
+	run env HOME="$HOME" PROJECT_ROOT="$PROJECT_ROOT" \
+		PATH="$mock_bin:/usr/bin:/bin" \
+		MOLE_PKG_RECEIPT_CACHE_DISABLE=1 /bin/bash --noprofile --norc << 'EOF'
+set -euo pipefail
+source "$PROJECT_ROOT/lib/core/common.sh"
+source "$HOME/pkg_receipts_mixed_test.sh"
+
+pkg_receipt_nonstandard_app_paths --require-complete
+EOF
+
+	[ "$status" -eq 0 ] || {
+		echo "$output"
+		return 1
+	}
+	[[ "$output" == *"$HOME/usr-local/Direct.APP"* ]] || return 1
+	[[ "$output" == *"$HOME/usr-local/Nested.App"* ]] || return 1
 }
 
 @test "a newly installed receipt invalidates the cached complete answer" {
@@ -636,7 +678,7 @@ MOCK
 	chmod +x "$mock_bin/pkgutil"
 	printf 'com.example.first\n' > "$pkgs_file"
 
-	sed -e "s|/usr/local/\*.app|$HOME/usr-local/*.app|g" \
+	sed -e "s|/usr/local/|$HOME/usr-local/|g" \
 		-e 's|MOLE_PKG_RECEIPTS_LOADED|MOLE_PKG_RECEIPTS_TEST_LOADED|g' \
 		"$PROJECT_ROOT/lib/core/pkg_receipts.sh" > "$HOME/pkg_receipts_cache_test.sh"
 

@@ -2380,7 +2380,8 @@ _batch_render_summary() {
 
             for success_path in "${success_items[@]}"; do
                 local display_name
-                display_name=$(basename "$success_path" .app)
+                display_name=$(basename "$success_path")
+                display_name="${display_name%.[aA][pP][pP]}"
                 local display_item="${GREEN}${display_name}${NC}"
 
                 if ((idx % 3 == 0)); then

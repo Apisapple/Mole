@@ -1292,7 +1292,9 @@ match_apps_by_name() {
                 IFS='|' read -r epoch app_path app_name bundle_id size last_used size_kb <<< "$word_app"
                 local word_name_lower word_dir_lower
                 word_name_lower=$(echo "$app_name" | tr '[:upper:]' '[:lower:]')
-                word_dir_lower=$(basename "$app_path" .app | tr '[:upper:]' '[:lower:]')
+                word_dir_lower=$(basename "$app_path")
+                word_dir_lower="${word_dir_lower%.[aA][pP][pP]}"
+                word_dir_lower=$(printf '%s' "$word_dir_lower" | tr '[:upper:]' '[:lower:]')
                 if [[ "$word_name_lower" == "$word_lower" || "$word_dir_lower" == "$word_lower" ]]; then
                     word_hit=true
                     break
@@ -1311,7 +1313,9 @@ match_apps_by_name() {
                 IFS='|' read -r epoch app_path app_name bundle_id size last_used size_kb <<< "$joined_app"
                 local joined_name_lower joined_dir_lower
                 joined_name_lower=$(echo "$app_name" | tr '[:upper:]' '[:lower:]')
-                joined_dir_lower=$(basename "$app_path" .app | tr '[:upper:]' '[:lower:]')
+                joined_dir_lower=$(basename "$app_path")
+                joined_dir_lower="${joined_dir_lower%.[aA][pP][pP]}"
+                joined_dir_lower=$(printf '%s' "$joined_dir_lower" | tr '[:upper:]' '[:lower:]')
                 if [[ "$joined_name_lower" == "$joined_lower" || "$joined_dir_lower" == "$joined_lower" ]]; then
                     selected_apps=("$joined_app")
                     return 0
@@ -1336,7 +1340,8 @@ match_apps_by_name() {
             name_lower=$(echo "$app_name" | tr '[:upper:]' '[:lower:]')
             # Also try matching against the .app directory base name
             local dir_name
-            dir_name=$(basename "$app_path" .app)
+            dir_name=$(basename "$app_path")
+            dir_name="${dir_name%.[aA][pP][pP]}"
             local dir_lower
             dir_lower=$(echo "$dir_name" | tr '[:upper:]' '[:lower:]')
 
@@ -1366,7 +1371,8 @@ match_apps_by_name() {
                 local name_lower
                 name_lower=$(echo "$app_name" | tr '[:upper:]' '[:lower:]')
                 local dir_name
-                dir_name=$(basename "$app_path" .app)
+                dir_name=$(basename "$app_path")
+                dir_name="${dir_name%.[aA][pP][pP]}"
                 local dir_lower
                 dir_lower=$(echo "$dir_name" | tr '[:upper:]' '[:lower:]')
 

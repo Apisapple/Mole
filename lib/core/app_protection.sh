@@ -142,7 +142,9 @@ official_uninstaller_vendor() {
     local normalized_bundle normalized_name normalized_path
     normalized_bundle=$(printf '%s' "$bundle_id" | LC_ALL=C tr '[:upper:]' '[:lower:]')
     normalized_name=$(printf '%s' "$display_name" | LC_ALL=C tr '[:upper:]' '[:lower:]')
-    normalized_path=$(basename "${app_path:-}" .app | LC_ALL=C tr '[:upper:]' '[:lower:]')
+    normalized_path=$(basename "${app_path:-}")
+    normalized_path="${normalized_path%.[aA][pP][pP]}"
+    normalized_path=$(printf '%s' "$normalized_path" | LC_ALL=C tr '[:upper:]' '[:lower:]')
 
     local rule vendor prefixes fragments prefix fragment
     local -a _prefixes _fragments
