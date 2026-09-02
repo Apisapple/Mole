@@ -5,7 +5,7 @@ description: "Mole incident catalog for destructive cleanup safety, bounded Shel
 
 # Mole bug patterns
 
-Use this catalog after reading the current symptom, diff, implementation, and callers. Generic review belongs to Waza `check`; root-cause investigation of a live failure belongs to `hunt`.
+Generic review belongs to Waza `check`; root-cause investigation of a live failure belongs to `hunt`.
 
 ## Route before loading details
 
