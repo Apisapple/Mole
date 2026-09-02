@@ -420,6 +420,30 @@ clean_code_editors() {
         safe_clean ~/Library/Application\ Support/CodeBuddy\ CN/logs/* "CodeBuddy CN logs"
     fi
 }
+# Lark / Feishu desktop embeds a Chromium webview (the "aha" explorer profile)
+# to render its in-app docs, sheets, slides, and AI surfaces. Every workspace
+# origin the user opens precaches the full editor bundle into that profile's
+# Service Worker CacheStorage, and stale workspaces plus superseded precache
+# versions are never evicted, so it grows without bound (measured at 27GB across
+# nine origin buckets on a heavy user's machine, oldest files ~11 months old).
+# This lives at a non-standard path the browser cleaners never reach.
+#
+# Reuse the shared Service Worker cleaner so the same per-origin-hash iteration,
+# PROTECTED_SW_DOMAINS skip, user-whitelist honoring, and safe_remove funnel that
+# Chrome and Arc get apply here unchanged. Only CacheStorage is targeted, never
+# the sibling ScriptCache (MV3 worker bytecode). Documents live on Lark's
+# servers and auth lives in Cookies / Local Storage, neither of which this path
+# touches; a cleared editor bundle is re-precached on next open.
+clean_feishu_service_worker_caches() {
+    declare -f clean_service_worker_cache > /dev/null 2>&1 || return 0
+    local sw_root="$HOME/Library/Application Support/LarkShell/aha/users"
+    [[ -d "$sw_root" ]] || return 0
+    local _profile
+    for _profile in "$sw_root"/*/profile_explorer; do
+        [[ -d "$_profile" ]] || continue
+        clean_service_worker_cache "Feishu" "${_profile%/}/Service Worker/CacheStorage"
+    done
+}
 # Communication apps.
 clean_communication_apps() {
     safe_clean ~/Library/Application\ Support/discord/Cache/* "Discord cache"
@@ -436,6 +460,7 @@ clean_communication_apps() {
     safe_clean ~/Library/Caches/com.tencent.WeWorkMac/* "WeCom cache"
     safe_clean ~/Library/Caches/com.tencent.qq/* "QQ cache"
     safe_clean ~/Library/Caches/com.feishu.*/* "Feishu cache"
+    clean_feishu_service_worker_caches
     if [[ -d ~/Library/Application\ Support/Microsoft/Teams ]]; then
         safe_clean ~/Library/Application\ Support/Microsoft/Teams/Cache/* "Microsoft Teams legacy cache"
         safe_clean ~/Library/Application\ Support/Microsoft/Teams/Application\ Cache/* "Microsoft Teams legacy application cache"

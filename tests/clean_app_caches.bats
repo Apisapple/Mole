@@ -875,6 +875,43 @@ EOF
     [[ "$output" == *"Microsoft Teams legacy logs"* ]]
 }
 
+@test "clean_communication_apps cleans Feishu embedded webview Service Worker per profile" {
+    run env HOME="$HOME" PROJECT_ROOT="$PROJECT_ROOT" /bin/bash --noprofile --norc << 'EOF'
+set -euo pipefail
+base="$HOME/Library/Application Support/LarkShell/aha/users"
+mkdir -p "$base/57bea93a/profile_explorer/Service Worker/CacheStorage"
+mkdir -p "$base/6ef03470/profile_explorer/Service Worker/CacheStorage"
+# A non-profile sibling under users/ must be ignored.
+mkdir -p "$base/global"
+source "$PROJECT_ROOT/lib/clean/app_caches.sh"
+safe_clean() { echo "SC|$2"; }
+clean_service_worker_cache() { echo "SW|$1|$2"; }
+clean_communication_apps
+EOF
+
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"SW|Feishu|$HOME/Library/Application Support/LarkShell/aha/users/57bea93a/profile_explorer/Service Worker/CacheStorage"* ]] || return 1
+    [[ "$output" == *"SW|Feishu|$HOME/Library/Application Support/LarkShell/aha/users/6ef03470/profile_explorer/Service Worker/CacheStorage"* ]] || return 1
+    [[ "$output" != *"users/global/"* ]] || return 1
+}
+
+@test "clean_feishu_service_worker_caches is a no-op when the aha profile root is absent" {
+    local empty_home
+    empty_home="$(mktemp -d "${BATS_TEST_DIRNAME}/tmp-app-caches.XXXXXX")"
+    run env HOME="$empty_home" PROJECT_ROOT="$PROJECT_ROOT" /bin/bash --noprofile --norc << 'EOF'
+set -euo pipefail
+source "$PROJECT_ROOT/lib/clean/app_caches.sh"
+clean_service_worker_cache() { echo "unexpected SW call"; }
+clean_feishu_service_worker_caches
+echo "done-no-op"
+EOF
+    rm -rf "$empty_home"
+
+    [ "$status" -eq 0 ]
+    [[ "$output" != *"unexpected SW call"* ]] || return 1
+    [[ "$output" == *"done-no-op"* ]] || return 1
+}
+
 @test "clean_gaming_platforms includes steam and minecraft related caches" {
     run env HOME="$HOME" PROJECT_ROOT="$PROJECT_ROOT" /bin/bash --noprofile --norc << 'EOF'
 set -euo pipefail
