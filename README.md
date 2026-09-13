@@ -16,9 +16,7 @@
   <img src="./docs/img/big-mole.png" alt="Mole cleanup results" width="1000" />
 </p>
 
-> 💡 Prefer a native app? [Mole for Mac](https://mole.fit/) brings cleanup, app management, maintenance, disk maps, and live status into one lightweight, VoiceOver-ready app. One license covers 2 Macs with lifetime updates and a 14-day refund.
-
-**This repository is the free open-source CLI (`mo`).** `brew install mole` and the commands below install that CLI only — not the Mac app. The app is a separate download at [mole.fit](https://mole.fit/).
+> 💡 This repo is the free open-source CLI (`mo`). Prefer a native app? [Mole for Mac](https://mole.fit/) is a separate download: cleanup, app management, maintenance, disk maps, and live status in one lightweight, VoiceOver-ready app. One license covers 2 Macs with lifetime updates and a 14-day refund. `brew install mole` installs the CLI only.
 
 ## Features
 
