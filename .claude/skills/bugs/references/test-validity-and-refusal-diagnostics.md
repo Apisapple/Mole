@@ -31,6 +31,7 @@ Remove the temporary fixture after the experiment. Count ineffective assertions 
 A case that passes alone and fails in the suite usually exposes shared state or a different runner contract before it exposes production behavior.
 
 - `setup_file` shares `HOME` across tests in one Bats file. Tests asserting absence, exact file count, cache freshness, or "only X" use a dedicated child `HOME` or remove only fixtures they created.
+- Discovery fixtures must also isolate fallback roots: stubbing Spotlight while leaving real `/Applications` scans active makes matching tests depend on the host's app inventory and scan budget. Keep real traversal inside each test's fixture roots.
 - Mutable shell counters do not survive command substitution because it runs in a subshell. Persist call state in a test-owned file when the production path captures stdout.
 - A sink may intentionally suppress a mock's stdout. Write a positive call trace to a test-owned file; an empty captured output cannot prove the sink was never reached.
 - Physical discovery can turn a fixture's `/var/...` HOME into `/private/var/...`. When the assertion depends on `~` abbreviation, canonicalize the fixture HOME with `pwd -P` inside the test and retain the exact assertion. Do not weaken it to accept any path or change production rendering to satisfy a symlink alias.
