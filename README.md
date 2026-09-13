@@ -16,11 +16,13 @@
   <img src="./docs/img/big-mole.png" alt="Mole cleanup results" width="1000" />
 </p>
 
-> 💡 Prefer a native app? [Mole for Mac](https://mole.fit/) brings cleanup, app management, maintenance, disk maps, and live status into one lightweight, VoiceOver-ready app. One license covers 2 Macs with lifetime updates and a 14-day refund. The CLI stays free and open source.
+> 💡 Prefer a native app? [Mole for Mac](https://mole.fit/) brings cleanup, app management, maintenance, disk maps, and live status into one lightweight, VoiceOver-ready app. One license covers 2 Macs with lifetime updates and a 14-day refund.
+
+**This repository is the free open-source CLI (`mo`).** `brew install mole` and the commands below install that CLI only — not the Mac app. The app is a separate download at [mole.fit](https://mole.fit/).
 
 ## Features
 
-- **All-in-one toolkit**: Combines CleanMyMac, AppCleaner, DaisyDisk, and iStat Menus in a **single binary**
+- **All-in-one CLI toolkit**: Combines CleanMyMac, AppCleaner, DaisyDisk, and iStat Menus style workflows in a **single terminal binary**
 - **Deep cleaning**: Removes caches, logs, leftovers, and orphaned app data to **reclaim gigabytes of space**
 - **Smart uninstaller**: Removes apps plus launch agents, preferences, and **hidden remnants**
 - **Disk insights**: Visualizes usage, finds large files, **rebuilds caches**, and refreshes system services
