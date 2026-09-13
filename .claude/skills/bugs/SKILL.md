@@ -49,7 +49,7 @@ discover or plan
 At every transition, answer:
 
 - Does live or unknown state fail closed?
-- Do timeout and signal statuses remain observable and stop later mutation?
+- Are timeouts classified by probe, sizing, removal, or section scope, with unknown evidence refusing deletion and cancellation stopping later mutation?
 - Are probe and sink bound to the same physical parent and target?
 - Do dry-run and real mode start from the same eligible plan without reusing stale authorization?
 - Are cheap missing, protected, whitelisted, and compiled-model filters ahead of recursive probes?

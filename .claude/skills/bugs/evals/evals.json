@@ -67,7 +67,7 @@
       "expected_output": "A sticky-cancellation review that propagates 124 and signal statuses through candidate loops, helper returns, worker boundaries, parent orchestration, peer reaping, dry-run registration, and later sections, with a non-vacuous downstream-positive-control test.",
       "files": [],
       "expectations": [
-        "Treats 124 and signal-derived statuses as cancellation of the whole destructive command",
+        "Treats this safety-probe timeout and signal-derived cancellation as a whole-command stop without confusing them with per-item removal timeouts or cooperative section budgets",
         "Explains why an exported worker variable does not mutate the parent shell",
         "Stops and reaps peer workers and prevents Office or later sections from starting",
         "Makes the later candidate otherwise succeed and proves its probe or sink is never reached",

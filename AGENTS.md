@@ -19,6 +19,7 @@ Mole is a terminal-first macOS maintenance toolkit. Its core job is to help powe
 - Keep `status` as a compact read-only health dashboard plus stable JSON/NDJSON automation output. It may surface actionable signals, but should not become an iStat clone, alerting daemon, or configurable metrics workbench.
 - Keep `optimize` focused on explicit, bounded maintenance tasks that can be explained before execution and tested without real authorization prompts.
 - Keep command UX dense and terminal-native: short labels, stable alignment, predictable shortcuts, one-screen summaries, then optional drill-down.
+- Keep routine per-item cleanup skips and timeouts out of the default summary. Do not add retry reminders or tuning variables there; retain diagnostics in logs and `--debug`, honest partial totals, and visible command-level failures. See `.claude/skills/bugs/references/state-accounting-and-progress.md`.
 - Keep Mole Mac references as a cross-link or support path. The CLI and Mac app can share product values without requiring feature parity.
 
 ### What Mole Should Not Do
@@ -152,6 +153,7 @@ These files are intentionally large. Do not start by splitting them. Keep edits 
 - `cmd/analyze/scanner.go` owns disk traversal, Spotlight integration, cancellation, and all scan concurrency budgets. Treat its semaphores as independent resource limits and measure before changing them. Run `go test ./cmd/analyze`.
 - `lib/clean/apps.sh` owns application-data cleanup, orphan service discovery, and the narrow verified-container-stub exception. `lib/clean/hints.sh` is read-only guidance and must stay bounded, timeout-aware, and non-destructive. Run `MOLE_TEST_NO_AUTH=1 bats tests/clean_apps.bats tests/clean_hints.bats`.
 - `lib/ui/menu_paginated.sh` owns the shared Bash 3.2-compatible selection UI and terminal restoration. Preserve trap chaining, TTY restoration, and empty-selection behavior. Run `MOLE_TEST_NO_AUTH=1 bats tests/menu_trap_restore.bats tests/uninstall.bats`.
+- `lib/core/ui.sh` owns shared loading frames and inline progress updates. Keep `mo_load_spinner_frames` as the frame loader for clean, purge, and uninstall; preserve complete UTF-8 frames under `LC_ALL=C` and update a live spinner's text without restarting it. Run `MOLE_TEST_NO_AUTH=1 bats tests/core_common.bats tests/clean_core.bats`; the rendering contract lives in `.claude/skills/bugs/references/state-accounting-and-progress.md`.
 - `cmd/status/view.go` owns status rendering only; collection and JSON/NDJSON contracts live elsewhere in `cmd/status/`. Keep narrow-terminal layout and automation output independent. Run `go test ./cmd/status` and `MOLE_TEST_NO_AUTH=1 bats tests/cli.bats` when command routing changes.
 - `bin/installer.sh` owns installer discovery, immutable delete-plan validation, the paginated selection flow, and incomplete-cleanup exit semantics. Run `MOLE_TEST_NO_AUTH=1 bats tests/installer.bats tests/installer_fd.bats tests/installer_zip.bats`.
 

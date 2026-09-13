@@ -4,7 +4,7 @@ Read this reference when changing Shell code, Bats tests, update/install flows, 
 
 ## 4. An external command or its consumer is unbounded
 
-`du`, `mdfind`, `find`, `xcrun simctl`, `system_profiler`, `ioreg`, and package tools can stall on a healthy but slow machine. Every production `du -s` route stays behind `run_with_timeout`; `tests/core_timeout.bats` pins the class.
+`du`, `mdfind`, `find`, `xcrun simctl`, `system_profiler`, `ioreg`, and package tools can stall on a healthy but slow machine. Every production `du -s` route stays behind `run_with_timeout` with `MOLE_TIMEOUT_DISK_VERIFY_SEC`; `tests/core_timeout.bats` pins the class across `lib/` and `bin/`.
 
 Check more than the obvious command:
 
@@ -28,8 +28,8 @@ done
 
 macOS ships Bash 3.2 and Mole runs with nounset.
 
-- Guard empty array expansion before `"${arr[@]}"`; an empty array under `set -u` can abort a scan and orphan its spinner (`893b4e6f`, `2c06cb91`).
-- `fn || handler` disables errexit inside `fn` for the whole function. Safety-critical steps use explicit `if ! command; then return 1; fi` (`a33a0b51`).
+- Guard `"${arr[@]}"` with `[[ ${#arr[@]} -gt 0 ]]`; an empty array under `set -u` can abort a scan and orphan its spinner (`893b4e6f`, `2c06cb91`).
+- `fn || handler` disables errexit inside `fn` for the whole function. Safety-critical steps use explicit `if ! command; then return 1; fi` (`a33a0b51`). Installers must also verify the installed binary's reported version before claiming success; `tests/install_checksum.bats` covers the exact caller shape.
 - Do not rely on a caller's temporary `set +e` window for graceful degradation. Capture the status where the command runs.
 - Optional `[[ -n "$value" ]] && action` returns 1 when absent. Use `if/fi` inside status-sensitive blocks.
 
@@ -58,7 +58,13 @@ Use `command grep` when flag behavior matters, because the interactive environme
 
 ## 15. Cancellation is local unless orchestration makes it sticky
 
-For a destructive command, timeout `124` and signal-derived statuses `>=128` cancel the remaining command, not merely the current helper. Carry that decision through every boundary:
+Classify a timeout at its source before propagating it. Signal-derived cancellation and safety-guard timeouts that the caller treats as cancellation must remain sticky across the remaining command. Status `124` alone does not define the scope:
+
+- In `bin/clean.sh`, a final delete guard returning `124` cancels later work, while an individual `safe_remove` timeout is a reported failed removal and later items may continue. Timed-out sizing contributes an unknown/partial total, not false reclaimed bytes.
+- Cloud & Office uses a cooperative section deadline: stop the remaining items in that section, preserve parent counters, report partial completion, and continue later sections. Do not restore its removed outer timeout worker or the file-backed deferred-family replay that existed only for that worker.
+- Purge discovery discards incomplete root scans and marks the run incomplete. An authored-content probe returning `2` keeps and visibly reports that candidate; deletion-phase activity or removal timeouts cancel the run. Unknown evidence never permits deletion.
+
+Once the caller establishes cancellation, carry that decision through every boundary:
 
 - A best-effort loop must check a pending cancellation before probing or registering the next candidate.
 - A helper that reports ordinary misses as success must return a pending cancellation before starting the next family.
@@ -66,17 +72,13 @@ For a destructive command, timeout `124` and signal-derived statuses `>=128` can
 - A parallel coordinator stops and reaps peer workers, preserves cancellation over ordinary failures, and prevents the next rendered section from starting.
 - Dry-run uses the same cancellation contract as real cleanup. A preview ledger is still downstream work and must not continue after safety evidence becomes unavailable.
 
-The regression shape matters. Make the first candidate return 124 or 130 and make the second candidate succeed if reached. Assert the exact top-level status plus the absence of a positive trace from the second probe, preview registration, sink, and later section. If both candidates independently time out, the test cannot prove cancellation was sticky.
+The regression shape matters. Make the first candidate's safety guard return 124 or 130 and make the second candidate succeed if reached. Assert the exact top-level status plus the absence of a positive trace from the second probe, preview registration, sink, and later section. If both candidates independently time out, the test cannot prove cancellation was sticky. Separately preserve the removal-timeout and cooperative-section-budget continuation cases in `tests/clean_core.bats`.
 
 Do not hide a cancelled safety probe behind `|| true`, a warning plus `return 0`, or a worker-local exported variable. Those shapes turn a global stop into a local skip.
 
 ## Focused pitfalls
 
 - **`BASH_SOURCE` / `$0` change meaning when a function moves files**: they name the file the code lives in, so copy-paste extraction is not behavior-preserving. `mole` captures `MOLE_ENTRY_SCRIPT="${BASH_SOURCE[0]}"` before sourcing anything, and update code reads that stable entrypoint. Before extracting a function, grep it for `BASH_SOURCE`, `$0`, and `FUNCNAME`. Regression coverage lives in `tests/update.bats`.
-- **Every `du -s` must run under `run_with_timeout`**: one stalled mount can wedge the whole scan. Use `MOLE_TIMEOUT_DISK_VERIFY_SEC`. `tests/core_timeout.bats` pins the source invariant across `lib/` and `bin/`.
-- **Bash 3.2 nounset rejects empty array expansion**: guard `"${arr[@]}"` with `[[ ${#arr[@]} -gt 0 ]]` under `set -u`.
-- **`fn || handler` disables errexit inside `fn` for its whole body**: safety-critical steps must use explicit `if ! cmd; then return 1; fi` checks and installers must verify the installed binary's reported version before claiming success. `tests/install_checksum.bats` covers the exact caller shape.
-- **`[[ -n "$var" ]] && cmd` returns 1 when the variable is empty**: inside exit-code-sensitive blocks, use `if/fi` so an optional action does not turn the block into failure.
 - **Bats heredocs share stdin with `read -n1`**: an inner `read -r -s -n1` can consume the next byte of the heredoc source. Redirect the function under test from `/dev/null`.
 - **macOS `script(1)` rejects socket-backed stdin**: PTY test helpers must redirect the wrapper's stdin from `/dev/null` or `script` can fail before starting the child. Capability probes use `/usr/bin/true`, not the absent `/bin/true`; inspect the actual failure before classifying it as unavailable TTY support, or live terminal tests silently skip.
 - **`run_with_timeout` execs the binary and bypasses shell-function mocks**: tests must use a PATH stub directory for commands such as `osascript`.
