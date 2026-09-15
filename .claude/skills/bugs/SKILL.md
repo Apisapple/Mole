@@ -61,6 +61,7 @@ Do not trade final-sink rebinding or fail-closed owner checks for speed. Optimiz
 
 ## Working contract
 
+- Before proposing a remedy, apply the Product Decision Filter in `AGENTS.md`: a new flag, environment variable, or visible retry message is a product change, even when the underlying fix is a safety improvement. Use the existing state/accounting reference when deciding what belongs in the normal summary.
 - Sweep siblings by call-site shape, not filename or helper name. Report `checked N / defective M / not applicable K`.
 - A recurring fix ships with a regression or source invariant that fails against the pre-fix code.
 - Treat tests as production consumers only after proving the production helper ran. Negative assertions require a positive trace.
